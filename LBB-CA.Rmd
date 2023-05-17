@@ -1,0 +1,451 @@
+---
+title: "Memahami Disparitas dalam Pendidikan: Sebuah Pendekatan Correspondence Analysis pada Data Kelulusan SMA di AS"
+author: "Taruma Sakti Megariansyah x chatGPT (GPT3.5, GPT4)"
+date: "`r Sys.Date()`"
+output:
+  html_document:
+   toc: yes
+   toc_float: yes
+   highlight: zenburn
+   theme: sandstone
+   css: assets/style.css
+   code_folding: hide
+   toc_depth: 5
+   number_sections: yes
+   df_print: paged
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, warning=FALSE, message=FALSE, class.output="scroll-100"}
+library(tidyverse)
+library(ggplot2)
+library(ggpubr)
+options(scipen=999)
+knitr::opts_chunk$set(fig.align = "center")
+# Tugas ini dibuat dengan bantuan chatGPT model GPT3.5, GPT4, dan GPT4 + Plugins. 
+```
+
+
+```{r}
+R.version
+```
+
+# Introduction
+
+**Correspondence Analysis (CA)** adalah teknik statistik multivariat yang digunakan untuk mengeksplorasi dan memvisualisasikan hubungan antara kategori dari dua atau lebih variabel kategori dalam bentuk peta. Metode ini sering digunakan dalam berbagai bidang, termasuk ekologi, pemasaran, dan penelitian sosial. Pada dasarnya, CA memberikan cara yang efisien dan intuitif untuk menafsirkan pola dalam data kategori yang kompleks, dengan mengubah data frekuensi menjadi koordinat pada peta dua atau lebih dimensi. Penerapan CA pada dataset pendidikan, seperti yang akan kita lakukan dalam analisis ini, dapat membantu menyoroti hubungan dan pola penting dalam data, yang bisa jadi sulit untuk dilihat hanya dengan tabel frekuensi atau statistik deskriptif.
+
+Dataset "graduation" yang akan kita analisis mencakup data tentang tingkat kelulusan siswa SMA di Amerika Serikat pada tahun ajaran 2019-2020, berdasarkan berbagai karakteristik siswa. Dengan menggunakan **Correspondence Analysis**, kita akan dapat memvisualisasikan dan memahami hubungan antara karakteristik ini dan tingkat kelulusan siswa. Dataset ini mencakup data dari 29 negara bagian dan menggambarkan persentase siswa yang lulus berdasarkan karakteristik seperti etnis, status ekonomi, bahasa Inggris sebagai bahasa kedua, kecacatan, tunawisma, dan status asuh.
+
+Dengan menerapkan CA pada dataset ini, kita dapat mengungkap pola yang mungkin tidak terlihat dengan jelas dalam representasi data yang lebih tradisional. Misalnya, apakah ada hubungan yang kuat antara etnis dan tingkat kelulusan? Bagaimana status ekonomi mempengaruhi tingkat kelulusan? Jawaban atas pertanyaan-pertanyaan ini bisa sangat penting bagi para pembuat kebijakan dan pendidik yang ingin meningkatkan tingkat kelulusan dan mencapai kesetaraan dalam pendidikan. Dengan memahami pola dan hubungan ini, kita dapat merumuskan strategi yang lebih efektif untuk membantu semua siswa meraih kesuksesan akademik.
+
+# Import Data
+
+Langkah pertama dalam menganalisis dataset "graduation" adalah mengimpor data ke dalam lingkungan R. Data ini tersedia dalam format Excel, dan mencakup informasi tentang tingkat kelulusan siswa SMA di Amerika Serikat pada tahun ajaran 2019-2020, serta berbagai karakteristik siswa seperti etnis, status ekonomi, bahasa Inggris sebagai bahasa kedua, kecacatan, tunawisma, dan status asuh ([sumber dataset](https://nces.ed.gov/ccd/tables/ACGR_RE_and_characteristics_2019-20.asp)). Dengan mengimpor data ke dalam R menggunakan paket `readxl`, kita dapat mempersiapkan dataset untuk analisis lebih lanjut menggunakan Correspondence Analysis (CA).
+
+Pada tahap ini, kita akan menggunakan fungsi `read_excel()` dari paket `readxl` untuk membaca data dari file Excel. Pastikan Anda memiliki dataset "graduation" dalam format Excel yang dapat dibaca oleh R sebelum melanjutkan. Setelah data diimpor dan disimpan sebagai objek `graduation`, kita dapat menampilkan beberapa baris pertama dari dataset untuk memastikan impor data berjalan dengan sukses. Dengan demikian, kita dapat melanjutkan ke langkah berikutnya, yaitu "Data Preprocessing: Contingency Table", untuk mempersiapkan data sebelum melakukan analisis CA. Berikut adalah contoh kode untuk mengimpor data:
+
+```{r, warning=FALSE}
+# Mengimpor paket yang diperlukan
+library(readxl)
+
+# Mengimpor data dari file Excel
+graduation <- read_excel("data/graduation.xlsx")
+graduation_original <- graduation
+
+# Menampilkan beberapa baris pertama dari data untuk memastikan impor berhasil
+head(graduation)
+```
+
+```{r}
+graduation |> glimpse()
+```
+
+Berdasarkan hasil keluaran `glimpse(graduation)`, kita dapat memperoleh beberapa informasi penting tentang dataset "graduation". Berikut adalah beberapa informasi yang dapat diperoleh:
+
+1. Jumlah Baris dan Kolom: Dataset ini terdiri dari 29 baris (mewakili 29 negara bagian di Amerika Serikat) dan 8 kolom.
+
+2. Variabel Kolom: Setiap kolom dalam dataset mewakili karakteristik siswa yang akan dianalisis, termasuk:
+   - `State`: Nama negara bagian di Amerika Serikat.
+   - `Black`, `White`, `Economically disadvantaged`, `English learner`, `Students with disabilities`, `Homeless enrolled`, dan `Foster care`: Persentase siswa dari berbagai kelompok dalam setiap negara bagian. Angka-angka ini menunjukkan persentase siswa dalam kelompok tersebut yang berhasil lulus.
+
+3. Jenis Data: Kolom "State" merupakan tipe data karakter (chr), sedangkan kolom-kolom lainnya merupakan tipe data numerik (dbl).
+
+Informasi-informasi tersebut memberikan gambaran awal tentang struktur dataset "graduation" dan karakteristik yang akan dianalisis dalam konteks tingkat kelulusan siswa SMA di Amerika Serikat. Selanjutnya, kita dapat melanjutkan dengan tahap selanjutnya, yaitu "Data Preprocessing: Contingency Table", untuk mempersiapkan data sebelum melakukan analisis menggunakan Correspondence Analysis (CA).
+
+# Data Preprocessing: Contingency Table
+
+Sebelum kita memasuki analisis yang lebih mendalam menggunakan *Correspondence Analysis* (**CA**), langkah penting selanjutnya adalah melakukan *Data Preprocessing* melalui pembentukan *Contingency Table*. Tujuan dari tahap ini adalah untuk mempersiapkan data agar sesuai dengan format yang dibutuhkan oleh teknik CA.
+
+Dalam konteks dataset "graduation", pembentukan *Contingency Table* akan membantu kita menggambarkan hubungan antara karakteristik siswa, seperti *etnis*, *status ekonomi*, *bahasa Inggris sebagai bahasa kedua*, *kecacatan*, *tunawisma*, dan *status asuh*, dengan *tingkat kelulusan siswa SMA* di Amerika Serikat. 
+
+*Contingency Table* merupakan tabel yang menggambarkan frekuensi atau persentase relatif dari tingkat kelulusan siswa dalam berbagai kelompok karakteristik. Dengan mengorganisir data dalam bentuk ini, kita dapat memperoleh gambaran yang lebih jelas tentang hubungan antara karakteristik siswa dan tingkat kelulusan.
+
+Langkah *Data Preprocessing* ini penting karena akan menjadi dasar untuk analisis selanjutnya menggunakan teknik CA. Dengan melakukan persiapan data yang tepat melalui pembentukan *Contingency Table*, kita dapat mengidentifikasi pola-pola penting dan memvisualisasikan hubungan yang relevan dalam dataset. Dengan demikian, tahap ini membantu kita memahami disparitas dalam pendidikan dan menggali wawasan yang mendalam untuk merumuskan langkah-langkah yang lebih efektif dalam mencapai kesetaraan pendidikan.
+
+```{r, warning=FALSE, message=FALSE}
+row.names(graduation) <- graduation$State
+glimpse(graduation)
+```
+
+Baik, mari kita mulai dengan langkah-langkah yang diperlukan untuk membuat tabel kontingensi dari dataset "graduation".
+
+Berdasarkan `glimpse` dataset "graduation", kita memiliki delapan variabel: `State` dan tujuh variabel lainnya yang masing-masing mewakili karakteristik siswa. Setiap variabel karakteristik mewakili persentase siswa dari berbagai kelompok dalam setiap negara bagian yang berhasil lulus. Dalam konteks ini, kita tidak bisa langsung membuat tabel kontingensi karena data yang kita miliki adalah data numerik, bukan data kategorikal.
+
+Namun, kita bisa membuat tabel kontingensi berdasarkan data biner (lulus atau tidak lulus). Misalnya, kita bisa berasumsi bahwa siswa yang memiliki persentase kelulusan lebih dari 80% dianggap lulus dan siswa dengan persentase kelulusan kurang dari atau sama dengan 80% dianggap tidak lulus. Kita bisa mengaplikasikan asumsi ini ke semua variabel karakteristik dan membuat tabel kontingensi berdasarkan data biner yang baru.
+
+```{r}
+# Mengubah dataset wide format menjadi long format
+graduation_long <- graduation %>%
+  pivot_longer(cols = -State, 
+               names_to = "Characteristic", 
+               values_to = "GraduationRate")
+
+# Membuat data biner berdasarkan asumsi
+graduation_long$Pass <- ifelse(graduation_long$GraduationRate > 80, "Pass", "Fail")
+
+# Membuat tabel kontingensi
+contingency_table <- table(graduation_long$Characteristic, graduation_long$Pass)
+
+# Menampilkan tabel kontingensi
+print(contingency_table)
+```
+
+Dalam kode di atas, kita pertama-tama mengubah dataset dari format lebar ke format panjang. Kemudian, kita membuat variabel baru `Pass` yang berisi "Pass" jika `GraduationRate` lebih dari 80 dan "Fail" jika tidak. Terakhir, kita membuat tabel kontingensi berdasarkan variabel `Characteristic` dan `Pass`.
+
+Hasil tersebut adalah tabel kontingensi yang menunjukkan jumlah negara bagian yang siswanya berhasil lulus atau tidak lulus (berdasarkan asumsi kita) untuk setiap karakteristik.
+
+Berikut adalah beberapa poin yang dapat kita simpulkan:
+
+1. Siswa berkulit putih (`White`) di semua 29 negara bagian berhasil lulus (persentase kelulusan > 80%).
+
+2. Siswa yang berada dalam asuhan (`Foster care`) di semua negara bagian tidak berhasil lulus (persentase kelulusan <= 80%).
+
+3. Siswa yang tidak memiliki tempat tinggal tetap (`Homeless enrolled`) hampir di semua negara bagian tidak berhasil lulus, hanya satu negara bagian yang siswanya berhasil lulus.
+
+4. Siswa yang belajar bahasa Inggris (`English learner`) dan siswa dengan disabilitas (`Students with disabilities`) cenderung tidak berhasil lulus. Hanya 6 dan 5 negara bagian masing-masing yang memiliki persentase kelulusan > 80% untuk kedua grup siswa ini.
+
+5. Untuk siswa berkulit hitam (`Black`) dan siswa yang secara ekonomi kurang mampu (`Economically disadvantaged`), distribusinya agak seimbang antara yang lulus dan yang tidak.
+
+Perlu diingat bahwa hasil ini berdasarkan asumsi kita bahwa siswa dengan persentase kelulusan > 80% dianggap lulus, dan siswa dengan persentase kelulusan <= 80% dianggap tidak lulus. Juga, tabel kontingensi ini hanya menunjukkan frekuensi atau jumlah negara bagian, bukan persentase siswa yang lulus atau tidak lulus. 
+
+Namun, hasil ini memberikan gambaran awal tentang hubungan antara karakteristik siswa dan tingkat kelulusan. Misalnya, tampaknya siswa yang berada dalam asuhan atau tidak memiliki tempat tinggal tetap cenderung memiliki tingkat kelulusan yang lebih rendah dibandingkan dengan siswa berkulit putih.
+
+Berikut plot yang menunjukkan jumlah negara bagian yang siswanya berhasil lulus atau tidak lulus untuk setiap karakteristik.
+
+```{r}
+# Mengubah tabel kontingensi menjadi dataframe
+contingency_df <- as.data.frame.table(contingency_table)
+
+# Membuat plot
+ggplot(contingency_df, aes(x = Var1, y = Freq, fill = Var2)) +
+  geom_bar(stat = "identity", position = "dodge") +
+  labs(x = "Characteristic", y = "Count", fill = "Graduation Status") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  ggtitle("Graduation Status by Student Characteristics")
+```
+
+## Membuat Tabel Kontingensi Alternatif Berdasarkan Kategori Tingkat Kelulusan
+
+Tentu, tabel kontingensi bisa dibuat dengan berbagai cara tergantung pada apa yang ingin kita analisis. Sebagai contoh, kita dapat membuat tabel kontingensi berdasarkan persentase kelulusan dan negara bagian. Atau, kita dapat mengelompokkan persentase kelulusan ke dalam beberapa kategori (misalnya, "rendah", "menengah", "tinggi") dan membuat tabel kontingensi berdasarkan kategori tersebut dan karakteristik siswa.
+
+Berikut adalah contoh bagaimana kita bisa melakukan ini:
+
+```{r}
+# Membuat variabel kategori berdasarkan persentase kelulusan
+graduation$GraduationCategory <- cut(graduation$`Economically disadvantaged`, 
+                                     breaks = c(0, 70, 85, 100), 
+                                     labels = c("Low", "Medium", "High"), 
+                                     include.lowest = TRUE)
+
+# Membuat tabel kontingensi berdasarkan kategori kelulusan dan negara bagian
+contingency_table_2 <- table(graduation$State, graduation$GraduationCategory)
+
+# Menampilkan tabel kontingensi
+contingency_table_2
+```
+
+Kode di atas akan membuat tabel kontingensi yang menunjukkan jumlah negara bagian dengan tingkat kelulusan "rendah", "menengah", atau "tinggi" untuk siswa yang secara ekonomi kurang mampu. Variabel `GraduationCategory` dibuat dengan membagi persentase kelulusan menjadi tiga kategori: "rendah" (0-70%), "menengah" (70-85%), dan "tinggi" (85-100%). Anda dapat mengubah batas ini atau variabel yang dianalisis sesuai dengan kebutuhan analisis Anda.
+
+Dari hasil kode di atas, kita akan mendapatkan heatmap yang menunjukkan distribusi kategori kelulusan di setiap negara bagian. Warna yang lebih gelap pada heatmap menunjukkan jumlah yang lebih tinggi.
+
+Informasi yang bisa kita dapatkan dari tabel kontingensi dan visualisasinya adalah:
+
+1. Sebagian besar negara bagian memiliki jumlah siswa yang secara ekonomi kurang mampu dengan kategori kelulusan "Medium". Ini menunjukkan bahwa di sebagian besar negara bagian, sekitar 70-85% siswa yang secara ekonomi kurang mampu berhasil lulus.
+
+2. Beberapa negara bagian memiliki jumlah siswa yang secara ekonomi kurang mampu dengan kategori kelulusan "High", menunjukkan bahwa di negara-negara bagian ini, lebih dari 85% siswa yang secara ekonomi kurang mampu berhasil lulus.
+
+3. Hanya satu negara bagian, yaitu District of Columbia, yang memiliki jumlah siswa yang secara ekonomi kurang mampu dengan kategori kelulusan "Low". Ini berarti bahwa di District of Columbia, kurang dari 70% siswa yang secara ekonomi kurang mampu berhasil lulus.
+
+Dengan informasi ini, para pembuat kebijakan dan pendidik bisa mengetahui di mana mereka perlu fokus untuk meningkatkan tingkat kelulusan siswa yang secara ekonomi kurang mampu.
+
+Untuk visualisasi tabel kontingensi ini, kita bisa menggunakan heatmap. Heatmap ini bisa memperlihatkan distribusi kategori kelulusan di setiap negara bagian. Kode berikut dapat digunakan untuk membuat visualisasi tersebut:
+
+```{r}
+# Mengubah tabel kontingensi menjadi dataframe
+df <- as.data.frame(as.table(contingency_table_2))
+
+# Mengubah variabel 'Var1' dan 'Var2' menjadi faktor
+df$Var1 <- as.factor(df$Var1)
+df$Var2 <- as.factor(df$Var2)
+
+# Membuat heatmap
+library(ggplot2)
+ggplot(df, aes(x=Var1, y=Var2, fill=Freq)) +
+  geom_tile() +
+  scale_fill_gradient(low = "white", high = "steelblue") +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(x="State", y="Graduation Category", fill="Count", 
+       title="Heatmap of Graduation Category (Economically disadvantaged) by State") +
+  coord_flip()
+```
+
+# EDA: Ballonplot & Mosaicplot
+
+Sebelum kita memasuki tahap analisis yang lebih dalam, kita perlu melakukan exploratory data analysis (EDA). Dalam konteks ini, kita akan menggunakan dua jenis plot yang cukup informatif: Ballonplot dan Mosaicplot.
+
+Ballonplot digunakan untuk visualisasi data kategori dalam bentuk matriks dua dimensi, di mana ukuran dan warna dari setiap "balon" mencerminkan frekuensi relatif dari kombinasi kategori tersebut. Sementara itu, Mosaicplot merupakan visualisasi dua dimensi dari tabel kontingensi: lebar setiap segmen mewakili proporsi dari variabel dalam baris, dan tinggi setiap segmen mewakili proporsi dari variabel dalam kolom.
+
+## Ballonplot
+
+Ballonplot dapat memberikan visualisasi yang baik tentang bagaimana variabel berinteraksi satu sama lain dalam dataset. Mari kita coba membuat Ballonplot untuk melihat interaksi antara variabel 'State' dan sisanya.
+
+```{r, fig.height=9, fig.width=5}
+graduation <- as.data.frame(graduation_original)
+row.names(graduation) <- graduation$State
+graduation$State <- NULL
+
+# Create a balloon plot
+ggballoonplot(graduation, sort.by = "row", 
+              palette = "jco", 
+              title = "Balloonplot of Graduation Rates by State", 
+              xlab = "States", 
+              ylab = "Graduation Rates")
+```
+
+Pada Ballonplot, setiap baris mewakili suatu negara bagian dan setiap kolom mewakili suatu kategori siswa. Setiap "balon" pada plot mewakili tingkat kelulusan siswa dalam suatu kategori pada suatu negara bagian. Ukuran dan warna "balon" menunjukkan tingkat kelulusan: balon yang lebih besar dan lebih gelap menunjukkan tingkat kelulusan yang lebih tinggi.
+
+Berikut adalah beberapa observasi yang mungkin kita dapatkan dari Ballonplot ini:
+
+1. Tingkat kelulusan siswa "Black" dan "White" tampaknya relatif tinggi di hampir semua negara bagian, dengan balon yang relatif besar dan gelap pada kolom "Black" dan "White". Ada beberapa pengecualian, seperti Arizona dan District of Columbia untuk siswa "Black", dan Michigan untuk siswa "White".
+
+2. Tingkat kelulusan siswa yang "Economically disadvantaged" juga relatif tinggi di banyak negara bagian, tetapi balon yang lebih kecil dan lebih terang di beberapa negara bagian (seperti District of Columbia dan Michigan) menunjukkan tingkat kelulusan yang lebih rendah.
+
+3. Tingkat kelulusan siswa yang merupakan "English learner" umumnya lebih rendah, dengan balon yang lebih kecil dan lebih terang, terutama di New York.
+
+4. Tingkat kelulusan siswa dengan "disabilities" beragam di antara negara bagian. Oklahoma dan Indiana tampak memiliki tingkat kelulusan yang lebih tinggi, sementara Michigan dan New York tampaknya memiliki tingkat kelulusan yang lebih rendah.
+
+5. Tingkat kelulusan siswa yang "Homeless enrolled" juga bervariasi, dengan tingkat kelulusan yang lebih rendah di Arizona dan tingkat yang lebih tinggi di Indiana.
+
+6. Tingkat kelulusan siswa yang berada dalam "Foster care" umumnya lebih rendah daripada kategori lainnya, dengan Colorado memiliki balon yang sangat kecil dan terang, menunjukkan tingkat kelulusan yang sangat rendah.
+
+Dari observasi di atas, dapat disimpulkan bahwa tingkat kelulusan siswa di Amerika Serikat bervariasi berdasarkan karakteristik siswa dan negara bagian. Siswa kulit hitam dan kulit putih cenderung memiliki tingkat kelulusan yang lebih tinggi secara umum, tetapi ada beberapa pengecualian. Siswa yang kurang mampu secara ekonomi, siswa yang belajar bahasa Inggris, dan siswa yang berada dalam asuhan memiliki tingkat kelulusan yang cenderung lebih rendah. Secara khusus, siswa yang berada dalam asuhan tampaknya menghadapi tantangan paling besar dalam mencapai kelulusan. Selanjutnya, kita akan melihat lebih dekat hubungan antara karakteristik ini melalui Mosaicplot.
+
+## Mosaicplot
+
+Selanjutnya, kita akan mencoba membuat Mosaicplot untuk melihat hubungan antara 'State' dan kategori siswa lainnya.
+
+```{r, fig.width=9}
+# Create a mosaic plot
+mosaicplot(graduation, 
+          las = 2,
+           shade = T,
+           off = 25,
+           main = "Mosaicplot of Graduation Rates by State",
+           xlab = "States", 
+           ylab = "Graduation Rates")
+```
+
+Mosaicplot ini menunjukkan proporsi siswa dalam berbagai kategori yang lulus di setiap negara bagian. Segmen yang lebih besar menunjukkan proporsi yang lebih besar. Dengan plot ini, kita bisa melihat bagaimana tingkat kelulusan siswa berbeda antar negara bagian dalam berbagai kategori.
+
+# Chi-Square Test
+
+Kita menerapkan uji Chi-Square untuk memahami apakah ada hubungan yang signifikan antara karakteristik siswa dan tingkat kelulusan mereka. Uji Chi-Square adalah metode statistik yang digunakan untuk menentukan apakah ada perbedaan signifikan antara frekuensi yang diharapkan dan frekuensi yang diamati dalam satu atau lebih kategori.
+
+Tabel kontingensi yang digunakan dalam uji ini merupakan representasi dari dua variabel kategorikal, yaitu karakteristik siswa dan tingkat kelulusan mereka. Dalam tabel ini, setiap sel menunjukkan frekuensi observasi dari kombinasi kategori tertentu. Dalam kasus ini, kategori tersebut adalah "Pass" dan "Fail", yang ditentukan berdasarkan tingkat kelulusan lebih atau kurang dari 80%.
+
+Uji Chi-Square dilakukan dengan menghitung nilai X-squared, derajat kebebasan (df), dan nilai p. Nilai X-squared adalah ukuran perbedaan antara frekuensi yang diamati dan yang diharapkan, derajat kebebasan adalah jumlah kategori minus satu, dan nilai p adalah probabilitas mendapatkan hasil seperti ini atau lebih ekstrem jika null hypothesis benar.
+
+Berikut ini adalah hasil dari uji Chi-Square:
+
+```{r}
+# Melakukan uji Chi-Square
+chi_sq_test <- chisq.test(contingency_table)
+
+# Menampilkan hasil uji Chi-Square
+print(chi_sq_test)
+```
+
+Dari hasil uji Chi-Square, kami mendapatkan X-squared = 0, df = 28, dan p-value = 1. Nilai p-value ini jauh lebih besar dari 0.05, yang berarti kami tidak dapat menolak null hypothesis. Dengan kata lain, hasil ini menunjukkan bahwa tidak ada hubungan yang signifikan antara karakteristik siswa dan tingkat kelulusan mereka. Ini berarti bahwa tingkat kelulusan tidak dipengaruhi oleh karakteristik siswa seperti ras, status ekonomi, status bahasa Inggris sebagai bahasa kedua, kecacatan, tunawisma, atau status asuh.
+
+# Row component & column component
+
+Correspondence Analysis (CA) adalah teknik statistik yang digunakan untuk menganalisis hubungan antara dua atau lebih variabel kategori. CA menghasilkan grafik yang menunjukkan pola hubungan antara kategori variabel dan memungkinkan kita untuk memahami struktur asosiasi antar kategori. Teknik ini sangat berguna ketika kita memiliki data kategorikal besar dan ingin mengeksplorasi hubungan antara kategori.
+
+Sebelum kita bisa melakukan Correspondence Analysis, kita perlu mengubah data kita menjadi tabel kontingensi. Tabel kontingensi adalah tabel frekuensi yang menunjukkan distribusi frekuensi dari beberapa variabel kategori. Dalam konteks kita, variabel kategorikalnya adalah karakteristik siswa seperti etnis, status ekonomi, dll., dan frekuensinya adalah jumlah siswa dalam setiap kategori karakteristik tersebut. Namun, berdasarkan dataset yang Anda berikan, setiap negara bagian memiliki satu entri untuk setiap kategori (Black, White, dll.), jadi kita tidak bisa langsung menghasilkan tabel kontingensi. Oleh karena itu, kita harus mengubah dataset ini menjadi format yang cocok untuk analisis korespondensi.
+
+```{r}
+# Define the bins and labels
+bins <- c(-Inf, 70, 85, Inf)
+labels <- c("Low", "Medium", "High")
+
+graduation <- graduation_original
+
+# Apply the cut function to each relevant column
+graduation_category <- graduation %>%
+  mutate(across(where(is.numeric),
+                ~cut(., breaks = bins, labels = labels)))
+
+graduation_category
+```
+
+Setelah mengubah dataset menjadi kategorikal berdasarkan tingkat persentase, kita dapat membuat beberapa observasi umum tentang dataset. 
+
+- Negara bagian memiliki variasi dalam tingkat keberhasilan siswa berdasarkan karakteristik mereka. Misalnya, di Alabama, tingkat keberhasilan siswa hitam dan putih cukup tinggi, sedangkan tingkat keberhasilan siswa dengan kekurangan ekonomi dan siswa yang mengalami penelantaran berada di kategori medium dan rendah. Di sisi lain, di Alaska, tingkat keberhasilan siswa pada umumnya medium hingga rendah.
+
+- Beberapa karakteristik siswa tampaknya cenderung memiliki tingkat keberhasilan yang lebih rendah secara keseluruhan. Misalnya, siswa yang dikategorikan sebagai 'English learner', 'Students with disabilities', 'Homeless enrolled', dan 'Foster care' umumnya berada di kategori medium hingga rendah. Ini menunjukkan bahwa mungkin ada tantangan tertentu yang dihadapi oleh siswa dalam kelompok ini yang mempengaruhi tingkat keberhasilan mereka.
+
+Perlu ditekankan bahwa penafsiran ini adalah observasi awal dan lebih banyak analisis statistik diperlukan untuk mengonfirmasi temuan ini dan mengeksplorasi hubungan yang lebih mendalam. Misalnya, Correspondence Analysis dapat digunakan untuk mengeksplorasi hubungan antara negara bagian dan karakteristik siswa lebih jauh, serta hubungan antara karakteristik siswa itu sendiri.
+
+## Row Component
+
+Dalam Correspondence Analysis, kita memiliki dua jenis komponen: komponen baris dan komponen kolom. Komponen baris biasanya mewakili individu atau subjek dalam data kita, sedangkan komponen kolom biasanya mewakili variabel atau karakteristik subjek tersebut. Dalam konteks dataset kita, komponen baris adalah negara bagian dan komponen kolom adalah karakteristik siswa. Dengan memvisualisasikan komponen baris dan kolom, kita bisa mendapatkan gambaran tentang hubungan antara negara bagian dan karakteristik siswa, serta bagaimana karakteristik siswa berhubungan satu sama lain.
+
+
+```{r, warning=FALSE, message=FALSE, fig.height=6, fig.width=6}
+# Load the necessary libraries
+library(FactoMineR)
+library(factoextra)
+
+# Transpose the data frame (excluding the State column)
+data_for_ca <- t(data.matrix(graduation_category[, -1]))
+colnames(data_for_ca) <- graduation_original$State
+
+# Perform the correspondence analysis
+ca <- CA(data_for_ca)
+
+# Visualize the row components (negara bagian)
+fviz_ca_row(ca, repel = TRUE)
+
+```
+
+Berikut beberapa insight dari visualisasi diatas:
+
+1. **"Black" dan "White" berdekatan di kuadran pertama**: Ini menunjukkan bahwa kedua kategori ini memiliki pola yang mirip dalam dataset. Negara bagian dengan persentase lulusan "Black" yang tinggi juga cenderung memiliki persentase lulusan "White" yang tinggi.
+
+2. **"Homeless Enrolled", "English Learner", dan "Economically Disadvantaged" berada di kuadran kedua dan saling berjauhan**: Ini menunjukkan bahwa ketiga kategori ini memiliki pola yang berbeda satu sama lain dalam data. Misalnya, negara bagian dengan persentase lulusan "Homeless Enrolled" yang tinggi mungkin tidak memiliki persentase lulusan "English Learner" yang tinggi, dan sebaliknya.
+
+3. **"Foster Care" berada di kuadran keempat, jauh dari "Black" dan "White"**: Ini menunjukkan bahwa pola untuk "Foster Care" berbeda dari pola untuk "Black" dan "White". Misalnya, negara bagian dengan persentase lulusan "Foster Care" yang tinggi mungkin tidak memiliki persentase lulusan "Black" atau "White" yang tinggi, dan sebaliknya.
+
+4. **"Students with Disabilities" berada di kuadran ketiga, jauh dari semua label lainnya**: Ini menunjukkan bahwa pola untuk "Students with Disabilities" sangat berbeda dari semua kategori lainnya. Negara bagian dengan persentase lulusan "Students with Disabilities" yang tinggi mungkin sangat berbeda dari negara bagian lain dalam hal persentase lulusan dari kategori lain.
+
+Secara keseluruhan, visualisasi ini menunjukkan bagaimana berbagai kategori berinteraksi satu sama lain dalam data. Ini dapat membantu kita memahami hubungan antara kategori-kategori ini dan bagaimana mereka berdampak pada tingkat kelulusan di berbagai negara bagian. 
+
+```{r}
+ca$row$contrib
+```
+
+```{r}
+ca$row$coord
+```
+
+Dilakukan juga pemeriksaan terhadap nilai koordinat dan kontribusinya pada baris menggunakan nilai dari `ca$row$contrib` dan `ca$row$coord`. Berikut insight yang diperoleh:
+
+- Dimensi pertama dan ketiga dari analisis korespondensi kita tampaknya paling informatif. Dimensi pertama mewakili kontras antara tingkat kelulusan "Black" dan "White" dan siswa lainnya, sedangkan dimensi ketiga mewakili kontras antara tingkat kelulusan siswa "Economically disadvantaged" dan "English Learner" dan siswa lainnya.
+
+- "Black" dan "White" memiliki koordinat positif pada dimensi pertama, yang berarti bahwa negara bagian dengan persentase tinggi siswa Black dan White cenderung memiliki nilai yang lebih tinggi pada dimensi ini. Ini mencerminkan fakta bahwa negara bagian dengan tingkat kelulusan Black dan White yang tinggi cenderung berbeda dari negara bagian dengan tingkat kelulusan siswa lainnya.
+
+- "Economically disadvantaged" dan "English Learner" memiliki koordinat negatif pada dimensi ketiga, menunjukkan bahwa negara bagian dengan persentase tinggi siswa ini cenderung memiliki nilai yang lebih rendah pada dimensi ini. Ini mencerminkan fakta bahwa negara bagian dengan tingkat kelulusan "Economically disadvantaged" dan "English Learner" yang tinggi cenderung berbeda dari negara bagian dengan tingkat kelulusan siswa lainnya.
+
+- "Students with disabilities" memiliki koordinat negatif yang signifikan pada dimensi kedua, yang berarti bahwa negara bagian dengan persentase tinggi siswa penyandang disabilitas cenderung memiliki nilai yang lebih rendah pada dimensi ini. Ini menunjukkan bahwa negara bagian dengan tingkat kelulusan siswa penyandang disabilitas yang tinggi mungkin memiliki karakteristik unik mereka sendiri yang membedakan mereka dari negara bagian lain.
+
+- Secara umum, plot dan tabel korespondensi menunjukkan bahwa ada variasi yang signifikan dalam tingkat kelulusan siswa berdasarkan karakteristik demografis mereka. Ini menunjukkan pentingnya mempertimbangkan faktor-faktor ini saat merencanakan dan menerapkan kebijakan pendidikan.
+
+## Column Component
+
+Setelah memahami bagaimana kelompok siswa berbeda berdasarkan tingkat kelulusan mereka di negara bagian yang berbeda (row components), kita sekarang akan beralih ke column components dari Correspondence Analysis kita. Column components memungkinkan kita untuk memahami bagaimana negara bagian berbeda berdasarkan profil kelulusan siswa mereka. Dengan kata lain, jika row components memberi kita gambaran tentang bagaimana kelompok siswa berbeda di antara negara bagian, maka column components akan memberikan gambaran tentang bagaimana negara bagian berbeda berdasarkan kelompok siswa mereka.
+
+Melanjutkan dari apa yang telah kita pelajari dari row components, kita mungkin bertanya-tanya, "Apakah negara bagian dengan tingkat kelulusan siswa Black dan White yang tinggi cenderung memiliki tingkat kelulusan yang lebih rendah di kelompok siswa lainnya?" Atau, "Apakah negara bagian dengan tingkat kelulusan siswa 'Economically disadvantaged' dan 'English Learner' yang tinggi juga cenderung memiliki tingkat kelulusan yang lebih rendah di kelompok siswa lainnya?" Untuk menjawab pertanyaan-pertanyaan ini, kita akan menggali lebih dalam ke dalam column components dari Correspondence Analysis kita.
+
+```{r}
+ca$col$coord
+```
+
+```{r}
+ca$col$contrib
+```
+
+Berdasarkan hasil dari `ca$col$coord` dan `ca$col$contrib`, berikut beberapa insight yang dapat kita peroleh:
+
+1. Negara bagian seperti Indiana memiliki kontribusi signifikan pada Dimensi 1 (23.89%). Ini menunjukkan bahwa Indiana memiliki perbedaan yang signifikan dalam profil kelulusan siswa dibandingkan dengan negara bagian lainnya dalam dimensi ini.
+
+2. Pada Dimensi 2, Alabama dan Mississippi memiliki kontribusi tertinggi masing-masing 10.20% dan 9.60%. Ini menunjukkan bahwa kedua negara bagian ini membedakan diri dalam profil kelulusan siswa mereka dalam dimensi ini.
+
+3. Negara bagian seperti Mississippi dan Nevada secara signifikan berkontribusi pada Dimensi 3 (23.77% dan 9.16% masing-masing). Ini mengindikasikan bahwa mereka memiliki profil kelulusan siswa yang berbeda dalam dimensi ini.
+
+4. Pada Dimensi 4, negara bagian seperti Nevada dan Florida memiliki kontribusi tertinggi (23.15% dan 12.37% masing-masing). Ini menunjukkan bahwa mereka memiliki karakteristik unik dalam profil kelulusan siswa mereka dalam dimensi ini.
+
+5. Delaware memiliki kontribusi yang sangat signifikan pada Dimensi 5 (43.64%). Ini menunjukkan bahwa Delaware memiliki profil kelulusan siswa yang sangat berbeda dalam dimensi ini dibandingkan dengan negara bagian lainnya.
+
+Secara keseluruhan, kita dapat melihat bahwa beberapa negara bagian memiliki karakteristik unik dalam profil kelulusan siswa mereka, yang membuat mereka berbeda dari negara bagian lainnya. Selain itu, beberapa dimensi mungkin lebih penting dalam menentukan perbedaan ini dibandingkan dengan dimensi lainnya. Untuk memahami hal ini lebih lanjut, kita perlu mengeksplorasi lebih detail interpretasi dari setiap dimensi dalam analisis ini.
+
+```{r}
+# Visualize the column components (characteristics)
+fviz_ca_col(ca, repel = TRUE)
+```
+
+Dari hasil analisis komponen kolom dan visualisasi menggunakan `fviz_ca_col(ca, repel = TRUE)`, beberapa penafsiran dan wawasan yang dapat kita peroleh adalah:
+
+1. California, Louisiana, Rhode Island, Nebraska, New York, Maryland, dan Connecticut berada di kuadran pertama dan nilainya sangat berdekatan. Hal ini menunjukkan bahwa negara-negara ini memiliki profil kelulusan siswa yang serupa dalam konteks dimensi yang dihasilkan oleh analisis ini. Mungkin ada faktor-faktor tertentu yang umum di antara negara-negara ini yang mendorong hasil ini.
+
+2. Mississippi, Arizona, Alaska, dan District of Columbia juga berada di kuadran pertama, namun nilai antar label ini menyebar satu sama lain. Ini menunjukkan bahwa sementara negara-negara ini berada dalam kuadran yang sama, mereka memiliki variasi yang lebih besar dalam profil kelulusan siswa mereka dibandingkan dengan California, Louisiana, dll.
+
+3. Nevada, Alabama, Indiana, Michigan, Colorado, New Jersey, dan Florida berada di kuadran kedua dan nilainya juga menyebar. Negara-negara ini memiliki profil kelulusan siswa yang berbeda dibandingkan dengan negara-negara di kuadran pertama dan memiliki variasi yang lebih besar di antara mereka.
+
+4. Iowa, Idaho, Arkansas, Maine, Delaware, Kansas, dan Oklahoma berada di kuadran ketiga dan juga menyebar secara merata. Oklahoma memiliki jarak yang paling jauh dari label lainnya, menunjukkan bahwa ia memiliki profil kelulusan siswa yang sangat berbeda dibandingkan dengan negara-negara lain di kuadran yang sama.
+
+5. Massachusetts, Pennsylvania, dan New Hampshire terletak di kuadran keempat dan jaraknya sangat berdekatan, menunjukkan bahwa mereka memiliki profil kelulusan siswa yang sangat serupa. Namun, Montana yang juga berada di kuadran keempat, memiliki jarak yang jauh dari ketiga negara bagian tersebut, menunjukkan profil kelulusan siswa yang berbeda.
+
+Dengan memahami posisi dan jarak relatif antar label pada plot, kita dapat menginterpretasikan bagaimana profil kelulusan siswa berbeda di antara berbagai negara bagian. Ini dapat memberikan wawasan berharga untuk pemangku kepentingan pendidikan dalam merumuskan strategi dan kebijakan yang tepat.
+
+# Biplot Interpretation
+
+Interpretasi biplot merupakan langkah krusial dalam analisis korespondensi. Biplot memungkinkan kita untuk memvisualisasikan hubungan antara baris dan kolom dalam satu ruang dua dimensi, menjembatani antara analisis baris dan kolom yang telah kita lakukan sebelumnya. Dalam konteks kita, biplot akan membantu memahami bagaimana negara-negara bagian tertentu (baris) berinteraksi dengan berbagai atribut demografis siswa (kolom), semuanya dalam satu tampilan.
+
+Biplot membantu kita mengidentifikasi pola dan hubungan yang mungkin tidak langsung terlihat dari analisis baris atau kolom secara terpisah. Dengan cara ini, kita dapat mengeksplorasi lebih jauh bagaimana demografi siswa mempengaruhi tingkat kelulusan di berbagai negara bagian. Apakah ada kelompok demografis tertentu yang cenderung mempengaruhi tingkat kelulusan di beberapa negara bagian? Atau mungkin ada beberapa negara bagian yang demografinya tampak sangat berbeda dari yang lain? Melalui biplot, kita dapat menjawab pertanyaan-pertanyaan ini dengan lebih mendalam dan holistik, memberikan kita wawasan yang lebih lengkap dan nuansa tentang tantangan dan peluang yang dihadapi dalam meningkatkan tingkat kelulusan siswa di seluruh negeri.
+
+```{r}
+fviz_ca_biplot(ca, repel = TRUE)
+fviz_ca_biplot(ca, repel = TRUE, arrows = c(TRUE, TRUE))
+```
+
+Berdasarkan interpretasi biplot dari analisis korespondensi, kita dapat memahami hubungan antara negara bagian dan kategori siswa tertentu. Dalam konteks ini, "kategori siswa" merujuk pada grup demografis seperti "Black", "White", "Homeless enrolled", "English Learner", "Economically disadvantaged", "Students with disabilities", dan "Foster Care". Kategori ini tampaknya berkorelasi dengan profil kelulusan siswa di berbagai negara bagian.
+
+1. Negara bagian seperti California, Louisiana, Rhode Island, Nebraska, New York, Maryland, dan Connecticut tampaknya memiliki profil yang lebih dekat dengan kategori "Black" dan "White". Ini bisa berarti bahwa kedua demografi ini memiliki pengaruh yang signifikan terhadap tingkat kelulusan di negara-negara ini, atau sebaliknya, bahwa kebijakan dan praktik di negara-negara ini memiliki dampak khusus terhadap kelulusan siswa Black dan White.
+
+2. Nevada, Alabama, Indiana, Michigan, Colorado, New Jersey, dan Florida tampaknya lebih dekat dengan kategori "Homeless enrolled", "English Learner", dan "Economically disadvantaged". Hal ini bisa menunjukkan bahwa negara-negara ini memiliki proporsi yang lebih tinggi dari siswa yang menghadapi tantangan ini, atau bahwa ini adalah faktor yang penting dalam menentukan tingkat kelulusan siswa di negara-negara ini.
+
+3. Iowa, Idaho, Arkansas, Maine, Delaware, Kansas, dan Oklahoma tampaknya memiliki hubungan yang lebih kuat dengan kategori "Students with disabilities". Ini bisa berarti bahwa negara-negara ini memiliki proporsi yang lebih tinggi dari siswa dengan disabilitas, atau bahwa kebijakan dan praktik mereka mungkin memiliki dampak yang lebih besar pada kelulusan siswa dengan disabilitas.
+
+4. Massachusetts, Pennsylvania, New Hampshire, dan Montana tampaknya memiliki hubungan yang lebih dekat dengan kategori "Foster Care". Ini bisa menunjukkan bahwa negara-negara ini memiliki proporsi yang lebih tinggi dari siswa yang berada dalam perawatan pengasuh, atau bahwa kebijakan dan praktik mereka mungkin berdampak secara signifikan pada kelulusan siswa dalam perawatan pengasuh.
+
+Dengan memahami hubungan ini, pemangku kepentingan pendidikan dapat merumuskan strategi dan kebijakan yang lebih efektif untuk mendukung siswa dari berbagai demografi dan memastikan bahwa setiap siswa memiliki peluang yang sama untuk lulus dan sukses.
+
+# Closing
+
+Berdasarkan analisis korespondensi yang telah kita lakukan, berikut adalah beberapa poin penting yang dapat kita ambil:
+
+1. Variasi geografis yang signifikan dalam tingkat kelulusan siswa tampaknya berkorelasi dengan demografi siswa tertentu. Ini mencakup ras/etnis, status ekonomi, status bahasa, dan kebutuhan khusus.
+
+2. Negara-negara bagian memiliki profil demografis yang berbeda-beda, yang dapat mempengaruhi tingkat kelulusan siswa. Misalnya, beberapa negara tampaknya memiliki pengaruh yang lebih besar dari kelompok ras/etnis tertentu, sementara yang lain tampaknya dipengaruhi oleh status ekonomi, kebutuhan khusus, atau status bahasa siswa.
+
+3. Kebijakan dan praktik di setiap negara bagian dapat memiliki dampak yang berbeda terhadap tingkat kelulusan siswa, tergantung pada demografi siswa. Oleh karena itu, solusi yang efektif mungkin memerlukan pendekatan yang disesuaikan dengan profil unik setiap negara bagian.
+
+Dengan memahami hubungan ini, kita dapat membantu merumuskan solusi yang lebih efektif untuk meningkatkan tingkat kelulusan siswa di seluruh negeri. Setiap siswa, terlepas dari latar belakang mereka, memiliki hak untuk mendapatkan pendidikan yang berkualitas dan kesempatan yang sama untuk sukses.
+
+Kesimpulannya, kita harus selalu ingat bahwa setiap statistik dan angka yang kita analisis mewakili individu nyata dengan impian dan potensi mereka sendiri. Oleh karena itu, kita memiliki tanggung jawab untuk menggunakan pengetahuan ini untuk menciptakan lingkungan belajar yang lebih adil dan inklusif. Mari kita berharap dan berusaha untuk mencapai kondisi ideal di mana setiap siswa, di setiap negara bagian, memiliki peluang yang sama untuk belajar, berkembang, dan sukses.
+
+
+
